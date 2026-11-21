@@ -3,6 +3,8 @@ package com.metallum.render;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class HostPlatformTest {
     @Test
@@ -27,6 +29,15 @@ class HostPlatformTest {
         assertEquals(HostPlatform.Kind.MACOS_X86_64, HostPlatform.detect("Mac OS X", "x86_64", () -> true));
         assertEquals(HostPlatform.Kind.MACOS_X86_64, HostPlatform.detect("Darwin", "amd64", () -> false));
         assertEquals(HostPlatform.Kind.MACOS_X86_64, HostPlatform.detect("Darwin", "x86_64", () -> false));
+    }
+
+    @Test
+    void rejectsRosettaUnlessExplicitlyAllowed() {
+        assertTrue(HostPlatform.rejectRosetta(HostPlatform.Kind.MACOS_X86_64, true, false));
+        assertFalse(HostPlatform.rejectRosetta(HostPlatform.Kind.MACOS_X86_64, true, true));
+        assertFalse(HostPlatform.rejectRosetta(HostPlatform.Kind.MACOS_X86_64, false, false));
+        assertFalse(HostPlatform.rejectRosetta(HostPlatform.Kind.MACOS_ARM64, true, false));
+        assertFalse(HostPlatform.rejectRosetta(HostPlatform.Kind.IOS, true, false));
     }
 
     @Test

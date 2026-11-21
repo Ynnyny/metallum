@@ -2,8 +2,17 @@ package com.metallum.render;
 
 import io.github.kokodio.metaljvm.objc.ObjC;
 
+import java.lang.foreign.Arena;
+import java.lang.foreign.FunctionDescriptor;
+import java.lang.foreign.Linker;
+import java.lang.foreign.MemorySegment;
+import java.lang.invoke.MethodHandle;
 import java.util.Locale;
 import java.util.function.BooleanSupplier;
+
+import static java.lang.foreign.ValueLayout.ADDRESS;
+import static java.lang.foreign.ValueLayout.JAVA_INT;
+import static java.lang.foreign.ValueLayout.JAVA_LONG;
 
 /** Runtime host detection used by the backend router and iOS compatibility guards. */
 public final class HostPlatform {
@@ -20,6 +29,7 @@ public final class HostPlatform {
             System.getProperty("metallum.platform", ""),
             HostPlatform::hasUIKit
     );
+    private static final boolean ROSETTA = detectRosetta();
 
     private HostPlatform() {
     }
@@ -34,6 +44,24 @@ public final class HostPlatform {
 
     public static boolean isMacOS() {
         return CURRENT == Kind.MACOS_ARM64 || CURRENT == Kind.MACOS_X86_64;
+    }
+
+    public static boolean isMacOSX86_64() {
+        return CURRENT == Kind.MACOS_X86_64;
+    }
+
+    /** True when this x86_64 process is running under Apple's Rosetta translation layer. */
+    public static boolean isRosetta() {
+        return ROSETTA;
+    }
+
+    /**
+     * The Intel provider must not silently initialize on Rosetta: the native GPU path is
+     * significantly slower and may expose a reduced feature set. An explicit opt-in is
+     * available for diagnostics via {@code -Dmetallum.allowRosetta=true}.
+     */
+    static boolean rejectRosetta(final Kind kind, final boolean rosetta, final boolean allowRosetta) {
+        return kind == Kind.MACOS_X86_64 && rosetta && !allowRosetta;
     }
 
     public static String describe(final Kind kind) {
@@ -88,6 +116,32 @@ public final class HostPlatform {
             return Kind.MACOS_X86_64;
         }
         return Kind.UNSUPPORTED;
+    }
+
+    private static boolean detectRosetta() {
+        try {
+            Linker linker = Linker.nativeLinker();
+            MethodHandle sysctlbyname = linker.downcallHandle(
+                    linker.defaultLookup().find("sysctlbyname").orElseThrow(),
+                    FunctionDescriptor.of(JAVA_INT, ADDRESS, ADDRESS, ADDRESS, ADDRESS, JAVA_LONG)
+            );
+            try (Arena arena = Arena.ofConfined()) {
+                MemorySegment name = arena.allocateFrom("sysctl.proc_translated");
+                MemorySegment value = arena.allocate(JAVA_INT);
+                MemorySegment size = arena.allocate(JAVA_LONG);
+                size.set(JAVA_LONG, 0L, JAVA_INT.byteSize());
+                int result = (int) sysctlbyname.invokeExact(
+                        name,
+                        value,
+                        size,
+                        MemorySegment.NULL,
+                        0L
+                );
+                return result == 0 && value.get(JAVA_INT, 0L) == 1;
+            }
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     private static boolean hasUIKit() {

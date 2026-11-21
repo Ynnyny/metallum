@@ -4,13 +4,8 @@ import com.metallum.Metallum;
 import com.mojang.renderpearl.api.GpuFormat;
 import com.mojang.renderpearl.api.buffers.GpuBuffer;
 import com.mojang.renderpearl.api.commands.GpuQueryPool;
-import com.mojang.renderpearl.api.device.DeviceFeatures;
 import com.mojang.renderpearl.api.device.DeviceInfo;
-import com.mojang.renderpearl.api.device.DeviceLimits;
-import com.mojang.renderpearl.api.device.DeviceType;
 import com.mojang.renderpearl.api.device.GpuDebugOptions;
-import com.mojang.renderpearl.api.device.HintsAndWorkarounds;
-import com.mojang.renderpearl.api.pipeline.ColorTargetState;
 import com.mojang.renderpearl.api.textures.AddressMode;
 import com.mojang.renderpearl.api.textures.FilterMode;
 import com.mojang.renderpearl.api.textures.GpuSampler;
@@ -53,7 +48,7 @@ final class MetalDevice implements GpuDeviceBackend {
         this.commandQueue = MetalUtilities.nonNil(this.metalDevice.newCommandQueue(), "newCommandQueue");
         MetalUtilities.init(this.metalDevice);
         this.commandEncoder = new MetalCommandEncoder(this);
-        this.deviceInfo = buildDeviceInfo(deviceName);
+        this.deviceInfo = MetalCapabilities.deviceInfo(this.metalDevice, deviceName);
         MTLSize threads = this.metalDevice.maxThreadsPerThreadgroup();
         Metallum.LOGGER.info(
                 "[metallum] Metal capability: family={}, maxBufferLength={}, maxThreadsPerThreadgroup={}x{}x{}, workingSetSupported={}",
@@ -277,30 +272,6 @@ final class MetalDevice implements GpuDeviceBackend {
     }
 
     private record MslFunctionKey(String msl, String entryPoint) {
-    }
-
-    private DeviceInfo buildDeviceInfo(final String deviceName) {
-        DeviceType type = DeviceType.INTEGRATED;
-        Set<String> extensions = Set.of();
-        String osVersion = System.getProperty("os.version", "").trim();
-        String driverDescription = (HostPlatform.isIOS() ? "iOS " : "macOS ") + osVersion;
-        long maxMemoryAllocationSize = metalDevice.maxBufferLength();
-        if (metalDevice.supportsRecommendedMaxWorkingSetSize()) {
-            maxMemoryAllocationSize = Math.min(maxMemoryAllocationSize, metalDevice.recommendedMaxWorkingSetSize());
-        }
-        return new DeviceInfo(
-                deviceName,
-                "Apple",
-                driverDescription,
-                true,
-                "Metal",
-                1.0F,
-                new DeviceLimits(16, 16, 16384, maxMemoryAllocationSize, Integer.MAX_VALUE, ColorTargetState.MAX_COLOR_TARGETS, Integer.MAX_VALUE),
-                new DeviceFeatures(true, true, true, true, true, true, true, true),
-                extensions,
-                new HintsAndWorkarounds(false, false, true, false),
-                type
-        );
     }
 
     @Nullable

@@ -27,12 +27,10 @@ import java.util.regex.Pattern;
 
 @Environment(EnvType.CLIENT)
 final class MetalCrossShaderCompiler {
-    private static final int MSL_VERSION_4_0 = 0x040000;
-    private static final int MSL_VERSION_2_0 = 0x020000;
     private static final int MSL_PLATFORM = HostPlatform.isIOS()
             ? Spvc.SPVC_MSL_PLATFORM_IOS
             : Spvc.SPVC_MSL_PLATFORM_MACOS;
-    private static final int MSL_VERSION = HostPlatform.isIOS() ? MSL_VERSION_2_0 : MSL_VERSION_4_0;
+    private static final int MSL_VERSION = MetalCapabilities.spirvCrossMslVersion();
     private static final int[] RESOURCE_TYPES = {
             Spvc.SPVC_RESOURCE_TYPE_UNIFORM_BUFFER,
             Spvc.SPVC_RESOURCE_TYPE_SAMPLED_IMAGE,

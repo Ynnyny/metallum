@@ -76,18 +76,25 @@ final class MetalTransientMemory implements TransientMemory {
 
     @Override
     public @NonNull MappedView allocateStaging(final long size, final long alignment, @Usage final int usage, final long minimumAllocation, final long elementSize) {
-        return allocateMapped(size, alignment, usage, minimumAllocation, elementSize);
+        return allocateMapped(size, uniformAlignment(alignment, usage), usage, minimumAllocation, elementSize);
     }
 
     @Override
     public @NonNull GpuBufferSlice allocateGpu(final long size, final long alignment, @Usage final int usage, final long minimumAllocation, final long elementSize) {
-        TransientBlockAllocator.Allocation<GpuBlock> alloc = gpuBlockAllocator.allocate(size, alignment, minimumAllocation, elementSize);
+        TransientBlockAllocator.Allocation<GpuBlock> alloc = gpuBlockAllocator.allocate(size, uniformAlignment(alignment, usage), minimumAllocation, elementSize);
         return new GpuBufferSlice(wrap(alloc.block().buffer(), usage), alloc.offset(), alloc.size());
     }
 
     @Override
     public @NonNull MappedView allocateGpuMapped(final long size, final long alignment, @Usage final int usage, final long minimumAllocation, final long elementSize) {
-        return allocateMapped(size, alignment, usage, minimumAllocation, elementSize);
+        return allocateMapped(size, uniformAlignment(alignment, usage), usage, minimumAllocation, elementSize);
+    }
+
+    private static long uniformAlignment(final long alignment, @Usage final int usage) {
+        if ((usage & GpuBuffer.USAGE_UNIFORM) == 0) {
+            return alignment;
+        }
+        return Math.max(alignment, MetalCapabilities.minUniformOffsetAlignment(HostPlatform.current()));
     }
 
     private MappedView allocateMapped(final long size, final long alignment, @Usage final int usage, final long minimumAllocation, final long elementSize) {
@@ -113,20 +120,21 @@ final class MetalTransientMemory implements TransientMemory {
     }
 
     private GpuBufferSlice upload(final List<ByteBuffer> data, final long alignment, @Usage final int usage, final long minimumAllocation, final long elementSize) {
+        long elementAlignment = uniformAlignment(alignment, usage);
         long totalSize = 0L;
         for (ByteBuffer buffer : data) {
             totalSize += buffer.remaining();
-            totalSize = Mth.roundToward(totalSize, alignment);
+            totalSize = Mth.roundToward(totalSize, elementAlignment);
         }
 
         GpuBufferSlice result;
-        try (MappedView mapped = allocateMapped(totalSize, alignment, usage, minimumAllocation, elementSize)) {
+        try (MappedView mapped = allocateMapped(totalSize, elementAlignment, usage, minimumAllocation, elementSize)) {
             long mappedPtr = MemoryUtil.memAddress(mapped.data());
             long offset = 0L;
             for (ByteBuffer buffer : data) {
                 MemoryUtil.memCopy(MemoryUtil.memAddress(buffer), mappedPtr + offset, Math.min(mapped.slice().length() - offset, buffer.remaining()));
                 offset += buffer.remaining();
-                offset = Mth.roundToward(offset, alignment);
+                offset = Mth.roundToward(offset, elementAlignment);
                 if (offset >= mapped.slice().length()) {
                     break;
                 }
@@ -147,6 +155,7 @@ final class MetalTransientMemory implements TransientMemory {
     }
 
     private List<GpuBufferSlice> multiUpload(final List<ByteBuffer> data, final long alignment, @Usage final int usage) {
+        long elementAlignment = uniformAlignment(alignment, usage);
         ReferenceArrayList<GpuBufferSlice> uploaded = new ReferenceArrayList<>();
         uploaded.size(data.size());
         IntArrayList sortedIndices = IntArrayList.toList(IntStream.range(0, data.size()));
@@ -158,9 +167,9 @@ final class MetalTransientMemory implements TransientMemory {
             for (int i = sortedIndices.size() - 1; i >= 0; i--) {
                 int bufferIndex = sortedIndices.getInt(i);
                 ByteBuffer currentBuffer = data.get(bufferIndex);
-                if (gpuBlockAllocator.canAllocateInCurrentBlock(currentBuffer.remaining(), alignment)) {
+                if (gpuBlockAllocator.canAllocateInCurrentBlock(currentBuffer.remaining(), elementAlignment)) {
                     sortedIndices.removeInt(i);
-                    try (MappedView view = allocateGpuMapped(currentBuffer.remaining(), alignment, usage)) {
+                    try (MappedView view = allocateGpuMapped(currentBuffer.remaining(), elementAlignment, usage)) {
                         MemoryUtil.memCopy(currentBuffer, view.data());
                         uploaded.set(bufferIndex, view.slice());
                     }
@@ -172,7 +181,7 @@ final class MetalTransientMemory implements TransientMemory {
             if (!allocatedAnything) {
                 int bufferIndex = sortedIndices.popInt();
                 ByteBuffer currentBuffer = data.get(bufferIndex);
-                try (MappedView view = allocateGpuMapped(currentBuffer.remaining(), alignment, usage)) {
+                try (MappedView view = allocateGpuMapped(currentBuffer.remaining(), elementAlignment, usage)) {
                     MemoryUtil.memCopy(currentBuffer, view.data());
                     uploaded.set(bufferIndex, view.slice());
                 }

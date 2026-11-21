@@ -427,9 +427,10 @@ final class MetalUtilities {
     static MTLLibrary newLibrary(final MTLDevice device, final String source) {
         MTLCompileOptions options = null;
         try (AutoreleasePool _ = AutoreleasePool.push()) {
-            if (HostPlatform.isIOS()) {
+            MTLLanguageVersion languageVersion = MetalCapabilities.appleLanguageVersion();
+            if (languageVersion != null) {
                 options = MTLCompileOptions.alloc().init();
-                options.setLanguageVersion(MTLLanguageVersion.Version2_0);
+                options.setLanguageVersion(languageVersion);
             }
             return device.newLibraryWithSource(source, options);
         } catch (NSErrorException exception) {

@@ -39,6 +39,7 @@ final class MetalCompiledRenderPipeline implements BackendRenderPipeline {
     record PushConstants(int metalIndex, int stageMask) {
     }
 
+    private final String name;
     private final List<ResourceBinding> resources;
     @Nullable
     private final PushConstants pushConstants;
@@ -68,6 +69,7 @@ final class MetalCompiledRenderPipeline implements BackendRenderPipeline {
             final MetalCrossShaderCompiler.Compiled compiled
     ) {
         this.device = device;
+        this.name = info.name();
         this.resources = compiled.resources();
         this.resourcesByName = resources.stream().collect(java.util.stream.Collectors.toUnmodifiableMap(ResourceBinding::name, binding -> binding));
 
@@ -119,6 +121,19 @@ final class MetalCompiledRenderPipeline implements BackendRenderPipeline {
             }
         }
         this.fullLayout = layout;
+
+        if (Boolean.getBoolean("metallum.debug")) {
+            DepthStencilState debugDepth = info.depthStencilState();
+            Metallum.LOGGER.info(
+                    "[metallum] pipeline {} depth={} writeDepth={} cull={} topology={} layout={}",
+                    info.name(),
+                    debugDepth == null ? "none" : debugDepth.depthTest(),
+                    debugDepth != null && debugDepth.writeDepth(),
+                    info.cull(),
+                    info.primitiveTopology(),
+                    layout
+            );
+        }
 
         this.descriptor = vertexFunction == null || fragmentFunction == null ? null : buildDescriptor(device, info, vertexFunction, fragmentFunction, this.firstAvailableVertexBufferSlot);
         if (this.descriptor != null && getNativePipeline(layout) == null) {
@@ -201,6 +216,10 @@ final class MetalCompiledRenderPipeline implements BackendRenderPipeline {
     @Override
     public boolean isClosed() {
         return this.closed;
+    }
+
+    String name() {
+        return this.name;
     }
 
     List<ResourceBinding> resources() {
