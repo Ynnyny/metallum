@@ -43,9 +43,11 @@ final class MetalSurface implements GpuSurfaceBackend {
         this.metalLayer.setDevice(metalDevice);
         this.metalLayer.setFramebufferOnly(false);
         this.metalLayer.setOpaque(true);
-        long colorspace = CGColorSpace.CGColorSpaceCreateWithName(MetallumConfig.INSTANCE.displayP3 ? CGColorSpace.kCGColorSpaceDisplayP3 : CGColorSpace.kCGColorSpaceSRGB);
-        this.metalLayer.setColorspace(colorspace);
-        CGColorSpace.CGColorSpaceRelease(colorspace);
+        if (!HostPlatform.isIOS()) {
+            long colorspace = CGColorSpace.CGColorSpaceCreateWithName(MetallumConfig.INSTANCE.displayP3 ? CGColorSpace.kCGColorSpaceDisplayP3 : CGColorSpace.kCGColorSpaceSRGB);
+            this.metalLayer.setColorspace(colorspace);
+            CGColorSpace.CGColorSpaceRelease(colorspace);
+        }
     }
 
     @Override
@@ -58,7 +60,9 @@ final class MetalSurface implements GpuSurfaceBackend {
         this.metalLayer.setDrawableSize(new CGSize(config.width(), config.height()));
         this.metalLayer.setAllowsNextDrawableTimeout(false);
         this.metalLayer.setPresentsWithTransaction(false);
-        this.metalLayer.setDisplaySyncEnabled(config.presentMode() != GpuSurface.PresentMode.MAILBOX);
+        if (this.metalLayer.supportsDisplaySyncEnabled()) {
+            this.metalLayer.setDisplaySyncEnabled(config.presentMode() != GpuSurface.PresentMode.MAILBOX);
+        }
     }
 
     @Override

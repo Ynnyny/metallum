@@ -1,6 +1,6 @@
 package com.metallum.mixin;
 
-import com.metallum.render.MetalBackend;
+import com.metallum.render.MetalBackendRouter;
 import com.mojang.renderpearl.api.device.GpuBackend;
 import net.minecraft.client.PreferredGraphicsApi;
 import net.minecraft.network.chat.Component;
@@ -13,7 +13,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 abstract class PreferredGraphicsApiMixin {
     @Inject(method = "getBackendsToTry", at = @At("HEAD"), cancellable = true)
     private void metallum$injectMetalBackend(final CallbackInfoReturnable<GpuBackend[]> cir) {
-        cir.setReturnValue(new GpuBackend[]{new MetalBackend()});
+        cir.setReturnValue(new GpuBackend[]{MetalBackendRouter.create()});
     }
 
     @Inject(method = "caption", at = @At("HEAD"), cancellable = true)

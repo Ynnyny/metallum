@@ -54,6 +54,48 @@ final class MetalDevice implements GpuDeviceBackend {
         MetalUtilities.init(this.metalDevice);
         this.commandEncoder = new MetalCommandEncoder(this);
         this.deviceInfo = buildDeviceInfo(deviceName);
+        MTLSize threads = this.metalDevice.maxThreadsPerThreadgroup();
+        Metallum.LOGGER.info(
+                "[metallum] Metal capability: family={}, maxBufferLength={}, maxThreadsPerThreadgroup={}x{}x{}, workingSetSupported={}",
+                gpuFamily(),
+                this.metalDevice.maxBufferLength(),
+                threads.width(),
+                threads.height(),
+                threads.depth(),
+                this.metalDevice.supportsRecommendedMaxWorkingSetSize()
+        );
+    }
+
+    private String gpuFamily() {
+        MTLGPUFamily[] candidates = {
+                MTLGPUFamily.Apple11,
+                MTLGPUFamily.Apple10,
+                MTLGPUFamily.Apple9,
+                MTLGPUFamily.Apple8,
+                MTLGPUFamily.Apple7,
+                MTLGPUFamily.Apple6,
+                MTLGPUFamily.Apple5,
+                MTLGPUFamily.Apple4,
+                MTLGPUFamily.Apple3,
+                MTLGPUFamily.Apple2,
+                MTLGPUFamily.Apple1,
+                MTLGPUFamily.Metal4,
+                MTLGPUFamily.Metal3,
+                MTLGPUFamily.Mac2,
+                MTLGPUFamily.Mac1,
+                MTLGPUFamily.Common3,
+                MTLGPUFamily.Common2,
+                MTLGPUFamily.Common1
+        };
+        for (MTLGPUFamily family : candidates) {
+            try {
+                if (this.metalDevice.supportsFamily(family)) {
+                    return family.name();
+                }
+            } catch (Throwable ignored) {
+            }
+        }
+        return "unknown";
     }
 
     @Override
@@ -241,8 +283,11 @@ final class MetalDevice implements GpuDeviceBackend {
         DeviceType type = DeviceType.INTEGRATED;
         Set<String> extensions = Set.of();
         String osVersion = System.getProperty("os.version", "").trim();
-        String driverDescription = "macOS " + osVersion;
-        long maxMemoryAllocationSize = Math.min(metalDevice.maxBufferLength(), metalDevice.recommendedMaxWorkingSetSize());
+        String driverDescription = (HostPlatform.isIOS() ? "iOS " : "macOS ") + osVersion;
+        long maxMemoryAllocationSize = metalDevice.maxBufferLength();
+        if (metalDevice.supportsRecommendedMaxWorkingSetSize()) {
+            maxMemoryAllocationSize = Math.min(maxMemoryAllocationSize, metalDevice.recommendedMaxWorkingSetSize());
+        }
         return new DeviceInfo(
                 deviceName,
                 "Apple",

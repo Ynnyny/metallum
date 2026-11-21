@@ -28,6 +28,11 @@ import java.util.regex.Pattern;
 @Environment(EnvType.CLIENT)
 final class MetalCrossShaderCompiler {
     private static final int MSL_VERSION_4_0 = 0x040000;
+    private static final int MSL_VERSION_2_0 = 0x020000;
+    private static final int MSL_PLATFORM = HostPlatform.isIOS()
+            ? Spvc.SPVC_MSL_PLATFORM_IOS
+            : Spvc.SPVC_MSL_PLATFORM_MACOS;
+    private static final int MSL_VERSION = HostPlatform.isIOS() ? MSL_VERSION_2_0 : MSL_VERSION_4_0;
     private static final int[] RESOURCE_TYPES = {
             Spvc.SPVC_RESOURCE_TYPE_UNIFORM_BUFFER,
             Spvc.SPVC_RESOURCE_TYPE_SAMPLED_IMAGE,
@@ -219,11 +224,11 @@ final class MetalCrossShaderCompiler {
                 checkSpvc(Spvc.spvc_compiler_create_compiler_options(compiler, pOptions), "spvc_compiler_create_compiler_options");
                 long options = pOptions.get(0);
                 checkSpvc(
-                        Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_PLATFORM, Spvc.SPVC_MSL_PLATFORM_MACOS),
+                        Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_PLATFORM, MSL_PLATFORM),
                         "spvc_compiler_options_set_uint(MSL_PLATFORM)"
                 );
                 checkSpvc(
-                        Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_VERSION, MSL_VERSION_4_0),
+                        Spvc.spvc_compiler_options_set_uint(options, Spvc.SPVC_COMPILER_OPTION_MSL_VERSION, MSL_VERSION),
                         "spvc_compiler_options_set_uint(MSL_VERSION)"
                 );
                 checkSpvc(

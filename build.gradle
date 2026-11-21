@@ -7,10 +7,16 @@ version = project.mod_version
 group = project.maven_group
 
 repositories {
+	def localMetalJvmRepo = findProperty("metal_jvm_local_repo")
+	if (localMetalJvmRepo) {
+		maven { url = uri(localMetalJvmRepo) }
+	}
 	maven { url "https://api.modrinth.com/maven" }
 }
 
 dependencies {
+	testImplementation "org.junit.jupiter:junit-jupiter:5.11.4"
+	testRuntimeOnly "org.junit.platform:junit-platform-launcher"
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	
 	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
@@ -25,6 +31,10 @@ processResources {
 	filesMatching("fabric.mod.json") {
 		expand "version": inputs.properties.version
 	}
+}
+
+tasks.test {
+	useJUnitPlatform()
 }
 
 tasks.withType(JavaCompile).configureEach {

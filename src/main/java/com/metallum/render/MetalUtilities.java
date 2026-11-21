@@ -425,11 +425,20 @@ final class MetalUtilities {
 
     @Nullable
     static MTLLibrary newLibrary(final MTLDevice device, final String source) {
+        MTLCompileOptions options = null;
         try (AutoreleasePool _ = AutoreleasePool.push()) {
-            return device.newLibraryWithSource(source, null);
+            if (HostPlatform.isIOS()) {
+                options = MTLCompileOptions.alloc().init();
+                options.setLanguageVersion(MTLLanguageVersion.Version2_0);
+            }
+            return device.newLibraryWithSource(source, options);
         } catch (NSErrorException exception) {
             Metallum.LOGGER.error("[metallum] Failed to compile MSL: {}", exception.getMessage());
             return null;
+        } finally {
+            if (options != null) {
+                options.release();
+            }
         }
     }
 
